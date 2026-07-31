@@ -19,7 +19,7 @@
 
 - **[Bun](https://bun.sh)** v1.0 이상
 - **[Tailscale](https://tailscale.com)** (권장) 또는 Cloudflare Tunnel
-- **Google OAuth** 클라이언트 ID/Secret ([생성 가이드](https://console.cloud.google.com/apis/credentials))
+- **Google OAuth** 클라이언트 ID/Secret → [📖 **OAuth 설정 가이드**](docs/oauth-setup-guide.md)
 
 ## 🚀 설치 방법
 
