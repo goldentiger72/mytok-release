@@ -1,0 +1,201 @@
+'use strict';
+
+/**
+ * bridge-hermes.js — Hermes Agent Bridge (OpenAI 호환 API)
+ *
+ * 실행: node --env-file=.env bridge-hermes.js
+ * 설정: .env 파일
+ *   HERMES_BOT_TOKEN  — Hermes 전용 봇 토큰 (없으면 BOT_TOKEN 사용)
+ *   MYTOK_URL         — MyTok 서버 주소 (기본: http://localhost:3500)
+ *   HERMES_URL        — Hermes API 주소 (기본: http://localhost:8642)
+ *   HERMES_API_KEY    — Hermes API Key (~/.hermes/.env 의 API_SERVER_KEY)
+ *   HERMES_MODEL      — 모델명 (기본: hermes)
+ *
+ * Hermes 사전 준비 (WSL Ubuntu):
+ *   1. ~/.hermes/.env → API_SERVER_ENABLED=true, API_SERVER_KEY=your-secret
+ *   2. hermes gateway   ← API 서버 + 메시징 게이트웨이 시작
+ *   3. WSL2는 Windows localhost:8642로 자동 포워딩됨
+ *
+ * [아키텍처 결정 — FR-006 변경]
+ * spec.md FR-006은 Ollama HTTP API(localhost:11434) 직접 호출로 설계되었으나,
+ * 실제 구현에서는 Hermes Agent API(localhost:8642, OpenAI 호환)를 사용한다.
+ * 이유: Hermes Desktop 앱이 멀티-모델 지원(Claude/Gemini/Ollama 통합),
+ * 메모리 관리, 도구 실행, 플러그인 시스템을 제공하므로 더 강력한 AI 허브 역할.
+ * Ollama 직접 연결은 bridge-hermes-ollama.js (미구현) 로 분리 가능.
+ */
+
+// .env 자체 로딩 — 실행 위치와 무관하게 bridges/.env 를 읽는다
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
+const { io: socketIo } = require('socket.io-client');
+
+const BOT_TOKEN   = process.env.HERMES_BOT_TOKEN || process.env.BOT_TOKEN;
+const MYTOK_URL   = (process.env.MYTOK_URL  || 'http://localhost:3500').replace(/\/$/, '');
+const HERMES_URL  = (process.env.HERMES_URL || 'http://localhost:8642').replace(/\/$/, '');
+const HERMES_KEY  = process.env.HERMES_API_KEY || '';
+const MODEL       = process.env.HERMES_MODEL || 'hermes';
+const TIMEOUT_MS  = 120_000;
+
+if (!BOT_TOKEN) {
+  console.error('[Hermes Bridge] BOT_TOKEN 또는 HERMES_BOT_TOKEN이 필요합니다.');
+  process.exit(1);
+}
+
+// ── 대화 히스토리 (인메모리) ────────────────────────────────────────────────
+const MAX_HISTORY = 20;
+const history = [];
+
+function addHistory(role, content) {
+  history.push({ role, content });
+  if (history.length > MAX_HISTORY) history.splice(0, 1);
+}
+
+// ── Hermes API 호출 (OpenAI 호환) ───────────────────────────────────────────
+async function askHermes(userMessage) {
+  addHistory('user', userMessage);
+
+  const messages = [
+    {
+      role: 'system',
+      content: '당신은 Hermes입니다. MyTok 채팅 앱에 연결된 AI 어시스턴트입니다. 한국어로 자연스럽게 대화하세요.'
+    },
+    ...history
+  ];
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    if (HERMES_KEY) headers['Authorization'] = `Bearer ${HERMES_KEY}`;
+
+    const res = await fetch(`${HERMES_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ model: MODEL, messages, stream: false }),
+      signal: controller.signal
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`Hermes API HTTP ${res.status}: ${text.slice(0, 200)}`);
+    }
+
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content?.trim() || '';
+    if (reply) addHistory('assistant', reply);
+    return reply;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── Hermes 서버 연결 확인 ──────────────────────────────────────────────────
+async function checkHermes() {
+  try {
+    const headers = {};
+    if (HERMES_KEY) headers['Authorization'] = `Bearer ${HERMES_KEY}`;
+    const res = await fetch(`${HERMES_URL}/v1/models`, { headers });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const models = data.data?.map(m => m.id).join(', ') || '(목록 없음)';
+    console.log(`[Hermes Bridge] Hermes API 연결됨 — 모델: ${models}`);
+    return true;
+  } catch (e) {
+    console.warn(`[Hermes Bridge] Hermes API 연결 실패: ${e.message}`);
+    console.warn(`  → WSL에서 실행: hermes gateway`);
+    console.warn(`  → ~/.hermes/.env: API_SERVER_ENABLED=true`);
+    return false;
+  }
+}
+
+// ── MyTok REST API ──────────────────────────────────────────────────────────
+async function sendMessage(content) {
+  const res = await fetch(`${MYTOK_URL}/bot/${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content })
+  });
+  if (!res.ok) throw new Error(`sendMessage HTTP ${res.status}`);
+}
+
+// "응답 작성 중" 표시 on/off — 표시용 신호라 실패는 조용히 무시
+async function sendTyping(on) {
+  try {
+    await fetch(`${MYTOK_URL}/bot/${BOT_TOKEN}/typing`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ on })
+    });
+  } catch (_) { /* ignore */ }
+}
+
+// ── Socket.io 연결 ───────────────────────────────────────────────────────────
+let processing = false;
+
+function connect() {
+  const socket = socketIo(MYTOK_URL, {
+    auth: { botToken: BOT_TOKEN },
+    query: { botToken: '1' },  // Engine.IO 레벨에서 봇 감지용 (세션 미들웨어 스킵)
+    reconnection: true,
+    reconnectionDelay: 3000,
+    reconnectionAttempts: Infinity
+  });
+
+  socket.on('connect', () => {
+    console.log(`[Hermes Bridge] MyTok 연결됨 (id: ${socket.id})`);
+  });
+
+  socket.on('bot_ready', ({ name, roomId }) => {
+    console.log(`[Hermes Bridge] 봇 인증 완료 — "${name}" (room:${roomId})`);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log(`[Hermes Bridge] 연결 끊김: ${reason} — 재연결 중...`);
+  });
+
+  socket.on('error', (err) => {
+    console.error('[Hermes Bridge] Socket 오류:', err?.message || err);
+  });
+
+  socket.on('new_message', async ({ message }) => {
+    if (message.isBot) return;
+
+    if (message.content.trim() === '/status') {
+      try {
+        const ok = await checkHermes();
+        await sendMessage(`🤖 Hermes Bridge\nAPI: ${HERMES_URL}\n상태: ${ok ? '✅ 연결됨' : '❌ 연결 실패'}`);
+      } catch (_) {}
+      return;
+    }
+
+    if (processing) {
+      try { await sendMessage('⏳ 이전 요청 처리 중입니다. 잠시 후 다시 시도해 주세요.'); } catch (_) {}
+      return;
+    }
+
+    processing = true;
+    console.log(`[Hermes Bridge] 처리 중: "${message.content.slice(0, 60)}..."`);
+    sendTyping(true); // "응답 작성 중" 표시 시작 (해제는 finally)
+
+    try {
+      const reply = await askHermes(message.content);
+      if (reply) {
+        await sendMessage(reply);
+        console.log(`[Hermes Bridge] 응답 전송 완료`);
+      }
+    } catch (e) {
+      console.error('[Hermes Bridge] 오류:', e.message);
+      try { await sendMessage(`⚠️ Hermes 오류: ${e.message}`); } catch (_) {}
+    } finally {
+      processing = false;
+      sendTyping(false); // "응답 작성 중" 해제
+    }
+  });
+
+  return socket;
+}
+
+// ── 시작 ───────────────────────────────────────────────────────────────────
+console.log(`[Hermes Bridge] 시작됨. MyTok: ${MYTOK_URL} | Hermes API: ${HERMES_URL}`);
+checkHermes().then(() => connect());

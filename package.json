@@ -1,0 +1,14 @@
+{
+  "name": "mytok",
+  "version": "1.0.0",
+  "description": "MyTok — Privacy-first self-hosted personal messenger",
+  "private": true,
+  "packageManager": "bun@1.3.11",
+  "scripts": {
+    "start": "bun --cwd backend start",
+    "setup": "cd backend && bun install && cd ../bridges && bun install"
+  },
+  "keywords": ["messenger", "self-hosted", "privacy", "chat", "tailscale"],
+  "author": "goldentiger72",
+  "license": "MIT"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "mytok-bridges",
+  "version": "1.0.0",
+  "description": "MyTok AI Bridge Scripts",
+  "private": true,
+  "type": "commonjs",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "dotenv": "^16.0.0",
+    "socket.io-client": "^4.8.0"
+  },
+  "scripts": {
+    "hermes":      "node bridge-hermes.js",
+    "claude-code": "node bridge-claude-code.js"
+  }
+}

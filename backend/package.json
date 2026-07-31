@@ -1,0 +1,27 @@
+{
+  "name": "mytok-backend",
+  "version": "1.0.0",
+  "description": "MyTok — Privacy-first self-hosted messenger backend",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "bun src/server.js",
+    "dev": "bun --watch src/server.js",
+    "test": "bun test tests"
+  },
+  "keywords": ["messenger", "self-hosted", "privacy", "chat", "websocket"],
+  "author": "goldentiger72",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "helmet": "^8.0.0",
+    "multer": "^2.2.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^14.0.1",
+    "zod": "^3.24.1"
+  }
+}
+

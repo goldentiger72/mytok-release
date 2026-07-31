@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>오프라인 — MyTok</title>
+  <style>
+    body { margin: 0; background: #0f0f1a; color: #e8e8f0; font-family: 'Noto Sans KR', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; }
+    .card { text-align: center; padding: 48px 32px; }
+    .icon { font-size: 64px; margin-bottom: 24px; }
+    h1 { font-size: 22px; margin-bottom: 12px; }
+    p { color: #9090b0; line-height: 1.7; margin-bottom: 28px; }
+    button { background: #4f46e5; color: #fff; border: none; border-radius: 10px; padding: 12px 28px; font-size: 15px; cursor: pointer; }
+    button:hover { background: #4338ca; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📡</div>
+    <h1>서버에 연결할 수 없습니다</h1>
+    <p>
+      MyTok 서버(Tailscale 네트워크)에 연결되지 않았습니다.<br>
+      Tailscale이 실행 중인지 확인하고 다시 시도해 주세요.
+    </p>
+    <button onclick="location.reload()">다시 시도</button>
+  </div>
+</body>
+</html>
