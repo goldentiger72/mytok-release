@@ -18,7 +18,7 @@
 ## 📋 필수 요구사항
 
 - **[Bun](https://bun.sh)** v1.0 이상
-- **[Tailscale](https://tailscale.com)** (권장) 또는 Cloudflare Tunnel
+- **[Tailscale](https://tailscale.com)** (권장) 또는 Cloudflare Tunnel → [📖 **Tailscale 설치 가이드**](docs/tailscale-setup-guide.md)
 - **Google OAuth** 클라이언트 ID/Secret → [📖 **OAuth 설정 가이드**](docs/oauth-setup-guide.md)
 
 ## 🚀 설치 방법
