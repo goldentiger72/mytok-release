@@ -106,56 +106,115 @@ tailscale status
 
 ---
 
-## 5단계: HTTPS 인증서 활성화 (권장)
+## 5단계: MagicDNS 활성화
 
-Tailscale은 자동으로 HTTPS 인증서를 발급해줍니다:
+MagicDNS를 켜면 IP 대신 **머신 이름**으로 접속할 수 있습니다.
 
-```bash
-# 서버 머신에서 실행
-tailscale cert my-macmini.tail12345.ts.net
+1. [Tailscale Admin Console](https://login.tailscale.com/admin/dns) 접속
+2. **DNS** 탭 선택
+3. **MagicDNS** 토글 → **Enabled** (켜기)
+4. **HTTPS Certificates** 토글 → **Enabled** (켜기)
+
+활성화 후 주소 형식:
+```
+https://my-macmini.tail12345.ts.net
 ```
 
-인증서 파일이 생성됩니다:
-- `my-macmini.tail12345.ts.net.crt` (인증서)
-- `my-macmini.tail12345.ts.net.key` (키)
+> 💡 `tail12345` 부분은 본인의 tailnet 이름입니다. Admin Console에서 확인하세요.
 
-> ℹ️ MyTok은 현재 Express HTTP 서버로, Tailscale 터널 자체가 암호화를 제공합니다.  
-> HTTPS가 필요한 경우 (PWA 설치 등) 향후 설정 가이드를 추가합니다.
+확인 방법:
+```bash
+tailscale status
+# 출력 예시:
+# 100.64.1.2   my-macmini   leejieun@   macOS   -
+```
 
 ---
 
-## 6단계: MyTok 환경변수 설정
+## 6단계: tailscale serve 설정 (HTTPS 프록시)
+
+`tailscale serve`는 MyTok의 HTTP(3500) 서버를 **자동 HTTPS**로 노출해줍니다.  
+별도의 인증서 설정이 필요 없습니다.
+
+### 설정
+
+서버 머신에서:
+
+```bash
+# MyTok(3500) → HTTPS 443으로 프록시
+tailscale serve https / http://localhost:3500
+```
+
+이제 접속 주소가 **포트 없이** 깔끔해집니다:
+```
+https://my-macmini.tail12345.ts.net
+```
+(기존: `https://my-macmini.tail12345.ts.net:3500`)
+
+### 설정 확인
+
+```bash
+tailscale serve status
+```
+
+출력 예시:
+```
+https://my-macmini.tail12345.ts.net (tailnet only)
+|-- / proxy http://127.0.0.1:3500
+```
+
+### 설정 해제 (필요 시)
+
+```bash
+tailscale serve reset
+```
+
+> ⚠️ **중요**: `tailscale serve`는 **tailnet 내부에서만** 접속 가능합니다.  
+> 인터넷에 공개하려면 `tailscale funnel`을 사용하세요 (비권장 — MyTok은 프라이버시 우선).
+
+---
+
+## 7단계: MyTok 환경변수 설정
 
 `backend/.env`에서 `BASE_URL`을 Tailscale 주소로 설정:
 
 ```env
-BASE_URL=https://my-macmini.tail12345.ts.net:3500
+# tailscale serve 사용 시 (포트 없음)
+BASE_URL=https://my-macmini.tail12345.ts.net
+
+# tailscale serve 미사용 시 (포트 명시)
+# BASE_URL=https://my-macmini.tail12345.ts.net:3500
 ```
 
-Google OAuth의 **승인된 리디렉션 URI**도 이 주소로 설정해야 합니다:
+Google OAuth의 **승인된 리디렉션 URI**도 이 주소에 맞춰 설정:
 ```
-https://my-macmini.tail12345.ts.net:3500/auth/google/callback
+https://my-macmini.tail12345.ts.net/auth/google/callback
 ```
 
 → 자세한 내용은 [📖 OAuth 설정 가이드](oauth-setup-guide.md) 참조
 
 ---
 
-## 7단계: 접속 테스트
+## 8단계: 접속 테스트
 
 1. 서버에서 MyTok 시작:
    ```bash
    ./start-mytok.sh --tailscale
    ```
 
-2. 접속 기기에서 **Tailscale 연결 상태** 확인 (초록색 아이콘)
-
-3. 브라우저에서 접속:
-   ```
-   https://my-macmini.tail12345.ts.net:3500
+2. `tailscale serve`가 실행 중인지 확인:
+   ```bash
+   tailscale serve status
    ```
 
-4. Google 로그인 → MyTok 메인 화면 진입 → ✅ 완료!
+3. 접속 기기에서 **Tailscale 연결 상태** 확인 (초록색 아이콘)
+
+4. 브라우저에서 접속:
+   ```
+   https://my-macmini.tail12345.ts.net
+   ```
+
+5. Google 로그인 → MyTok 메인 화면 진입 → ✅ 완료!
 
 ---
 
@@ -199,6 +258,21 @@ https://my-macmini.tail12345.ts.net:3500/auth/google/callback
 ### Q: 배터리/데이터 소모가 심하지 않나요?
 
 Tailscale은 WireGuard 기반으로 매우 가볍습니다. 백그라운드 유지 시에도 배터리·데이터 소모가 거의 없습니다.
+
+### Q: `tailscale serve`가 재부팅 후에도 유지되나요?
+
+**네.** `tailscale serve` 설정은 Tailscale에 영구 저장됩니다. 재부팅 후 Tailscale이 자동 실행되면 serve도 자동으로 복원됩니다.
+
+### Q: PWA 설치가 안 됩니다
+
+PWA 설치에는 **HTTPS**가 필수입니다. `tailscale serve`를 설정하면 자동으로 HTTPS가 적용되어 PWA 설치가 가능해집니다.
+
+- ✅ `https://my-macmini.tail12345.ts.net` → PWA 설치 가능
+- ❌ `http://localhost:3500` → PWA 설치 불가 (localhost 제외)
+
+### Q: MagicDNS 주소가 안 뜹니다
+
+Admin Console → DNS → **MagicDNS**가 꺼져 있을 수 있습니다. 5단계를 다시 확인하세요. 활성화 후 `tailscale status`에서 DNS 이름이 표시됩니다.
 
 ---
 
