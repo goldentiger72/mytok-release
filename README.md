@@ -11,7 +11,7 @@
 - **🔒 프라이버시 우선**: 메시지·파일 모두 소유자 서버에만 저장
 - **🌐 Tailscale VPN**: 공개 포트 없이 암호화된 사설 네트워크
 - **📱 PWA 지원**: 모바일/데스크톱 앱처럼 설치 가능
-- **🤖 AI 봇 지원**: Hermes, Claude Code 등 AI 에이전트 연동
+- **🤖 AI 봇 지원**: Hermes, Claude Code, OpenClaw 등 AI 에이전트 연동 → [📖 **원격 AI 에이전트 연동 가이드**](docs/multi-device-agent-guide.md)
 - **🎨 테마 커스터마이징**: 골드/오션/로즈 3가지 디자인 테마
 - **♿ 접근성**: 글자 크기 4단계, 고대비 모드
 
