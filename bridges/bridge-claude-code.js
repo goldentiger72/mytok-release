@@ -198,7 +198,52 @@ function connect() {
     console.log(`[Claude Code Bridge] 서버 연결됨 (id: ${socket.id})`);
   });
 
+// ── 스마트 멘션 & 턴 제어 (Agent-to-Agent 루프 방지) ───────────────────────
+let myBotName = process.env.BOT_NAME || 'Claude Code';
+let botTurns = 0;
+const MAX_BOT_TURNS = 5;
+
+function isMentioned(content, name) {
+  if (!content) return false;
+  const lower = content.toLowerCase();
+  if (!name) return lower.includes('@claude') || lower.includes('@클로드');
+  
+  const cleanName = name.toLowerCase().replace(/\s+/g, '');
+  const firstName = cleanName.split(/bot|agent/)[0] || cleanName;
+  
+  return lower.includes(`@${cleanName}`) || 
+         lower.includes(`@${firstName}`) ||
+         lower.includes(`@${name.toLowerCase()}`) ||
+         lower.includes('@claude') ||
+         lower.includes('@클로드');
+}
+
+function shouldProcessMessage(message) {
+  if (!message.isBot) {
+    botTurns = 0;
+    return true;
+  }
+
+  if (myBotName && message.senderName === myBotName) {
+    return false;
+  }
+
+  if (!isMentioned(message.content, myBotName)) {
+    return false;
+  }
+
+  botTurns++;
+  if (botTurns > MAX_BOT_TURNS) {
+    console.warn(`[Claude Code Bridge] ⚠️ 연속 봇 대화 제한(${MAX_BOT_TURNS}회) 도달으로 응답 중단`);
+    return false;
+  }
+
+  console.log(`[Claude Code Bridge] 🤖 봇 멘션 감지 (연속 턴 ${botTurns}/${MAX_BOT_TURNS}): [${message.senderName}] -> "@${myBotName}"`);
+  return true;
+}
+
   socket.on('bot_ready', ({ name, roomId }) => {
+    if (name) myBotName = name;
     console.log(`[Claude Code Bridge] 봇 인증 완료 — "${name}" (room:${roomId}) | 타임아웃: ${TIMEOUT_MS / 1000}초`);
   });
 
@@ -216,8 +261,7 @@ function connect() {
 
   // ── 핵심: 메시지 이벤트 수신 ────────────────────────────────────────────
   socket.on('new_message', async ({ message }) => {
-    // 봇 자신이 보낸 메시지 무시
-    if (message.isBot) return;
+    if (!shouldProcessMessage(message)) return;
 
     // /status 명령어
     if (message.content.trim() === '/status') {

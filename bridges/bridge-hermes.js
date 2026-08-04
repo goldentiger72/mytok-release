@@ -130,6 +130,52 @@ async function sendTyping(on) {
   } catch (_) { /* ignore */ }
 }
 
+// ── 스마트 멘션 & 턴 제어 (Agent-to-Agent 루프 방지) ───────────────────────
+let myBotName = process.env.BOT_NAME || 'Hermes';
+let botTurns = 0;
+const MAX_BOT_TURNS = 5;
+
+function isMentioned(content, name) {
+  if (!content) return false;
+  const lower = content.toLowerCase();
+  if (!name) return lower.includes('@hermes') || lower.includes('@봇');
+  
+  const cleanName = name.toLowerCase().replace(/\s+/g, '');
+  const firstName = cleanName.split(/bot|agent/)[0] || cleanName;
+  
+  return lower.includes(`@${cleanName}`) || 
+         lower.includes(`@${firstName}`) ||
+         lower.includes(`@${name.toLowerCase()}`);
+}
+
+function shouldProcessMessage(message) {
+  // 1. 사람이 보낸 메시지면 연속 봇 턴 카운터 리셋 후 응답
+  if (!message.isBot) {
+    botTurns = 0;
+    return true;
+  }
+
+  // 2. 봇 자신이 보낸 메시지는 무시
+  if (myBotName && message.senderName === myBotName) {
+    return false;
+  }
+
+  // 3. 다른 봇이 보낸 메시지인 경우: @멘션이 있을 때만 응답
+  if (!isMentioned(message.content, myBotName)) {
+    return false;
+  }
+
+  // 4. 무한 대화 방지: 연속 봇 턴 제한
+  botTurns++;
+  if (botTurns > MAX_BOT_TURNS) {
+    console.warn(`[Hermes Bridge] ⚠️ 연속 봇 대화 제한(${MAX_BOT_TURNS}회) 도달으로 응답 중단`);
+    return false;
+  }
+
+  console.log(`[Hermes Bridge] 🤖 봇 멘션 감지 (연속 턴 ${botTurns}/${MAX_BOT_TURNS}): [${message.senderName}] -> "@${myBotName}"`);
+  return true;
+}
+
 // ── Socket.io 연결 ───────────────────────────────────────────────────────────
 let processing = false;
 
@@ -147,6 +193,7 @@ function connect() {
   });
 
   socket.on('bot_ready', ({ name, roomId }) => {
+    if (name) myBotName = name;
     console.log(`[Hermes Bridge] 봇 인증 완료 — "${name}" (room:${roomId})`);
   });
 
@@ -159,7 +206,7 @@ function connect() {
   });
 
   socket.on('new_message', async ({ message }) => {
-    if (message.isBot) return;
+    if (!shouldProcessMessage(message)) return;
 
     if (message.content.trim() === '/status') {
       try {

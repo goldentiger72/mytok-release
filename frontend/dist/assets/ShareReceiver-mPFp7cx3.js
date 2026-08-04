@@ -1,4 +1,4 @@
-import{a as e}from"./index-B54xd5Mb.js";async function t(t,a){let{title:o,text:s,url:c}=a,l=[o,s,c].filter(Boolean).join(`
+import{a as e}from"./index-BR4L0M2t.js";async function t(t,a){let{title:o,text:s,url:c}=a,l=[o,s,c].filter(Boolean).join(`
 `).trim();c&&s&&s.includes(c)&&(l=[o,s].filter(Boolean).join(`
 `).trim());try{await e.getMe()}catch(e){if(!e.status){n(t,a);return}sessionStorage.setItem(`pending_share`,JSON.stringify(a)),window.location.href=`/auth/google`;return}let u=[];try{u=await e.getRooms()}catch{}t.innerHTML=`
     <div class="share-receiver" id="share-receiver">

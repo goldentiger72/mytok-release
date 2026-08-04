@@ -166,8 +166,53 @@ function connectMyTok() {
     console.log(`[OpenClaw Bridge] MyTok connected (id: ${socket.id})`);
   });
 
+// ── 스마트 멘션 & 턴 제어 (Agent-to-Agent 루프 방지) ───────────────────────
+let myBotName = process.env.BOT_NAME || 'OpenClaw';
+let botTurns = 0;
+const MAX_BOT_TURNS = 5;
+
+function isMentioned(content, name) {
+  if (!content) return false;
+  const lower = content.toLowerCase();
+  if (!name) return lower.includes('@openclaw') || lower.includes('@오픈클로');
+  
+  const cleanName = name.toLowerCase().replace(/\s+/g, '');
+  const firstName = cleanName.split(/bot|agent/)[0] || cleanName;
+  
+  return lower.includes(`@${cleanName}`) || 
+         lower.includes(`@${firstName}`) ||
+         lower.includes(`@${name.toLowerCase()}`) ||
+         lower.includes('@openclaw') ||
+         lower.includes('@오픈클로');
+}
+
+function shouldProcessMessage(message) {
+  if (!message.isBot) {
+    botTurns = 0;
+    return true;
+  }
+
+  if (myBotName && message.senderName === myBotName) {
+    return false;
+  }
+
+  if (!isMentioned(message.content, myBotName)) {
+    return false;
+  }
+
+  botTurns++;
+  if (botTurns > MAX_BOT_TURNS) {
+    console.warn(`[OpenClaw Bridge] ⚠️ 연속 봇 대화 제한(${MAX_BOT_TURNS}회) 도달으로 응답 중단`);
+    return false;
+  }
+
+  console.log(`[OpenClaw Bridge] 🤖 봇 멘션 감지 (연속 턴 ${botTurns}/${MAX_BOT_TURNS}): [${message.senderName}] -> "@${myBotName}"`);
+  return true;
+}
+
   socket.on('bot_ready', (data) => {
     botRoomId = data.roomId;
+    if (data.name) myBotName = data.name;
     console.log(`[OpenClaw Bridge] Bot ready: "${data.name}" (room:${botRoomId})`);
   });
 
@@ -178,7 +223,7 @@ function connectMyTok() {
   socket.on('new_message', async (payload) => {
     const msg = payload.message;
     if (!msg) return;
-    if (msg.isBot) return;           // 봇 메시지 무시
+    if (!shouldProcessMessage(msg)) return;
     if (msg.roomId !== botRoomId) return;
 
     const text = (msg.content || '').trim();

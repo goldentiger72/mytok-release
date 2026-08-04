@@ -1,8 +1,7 @@
 # MyTok AI Bridge Scripts
 
-각 스크립트는 **독립 프로세스**로 실행되며, MyTok 서버와는 웹소켓/Bot API로 통신합니다.
-
-> 📖 **원격 기기 연동 및 에이전트 간 대화 상세 가이드**: [docs/multi-device-agent-guide.md](../docs/multi-device-agent-guide.md)
+MyTok 채팅방과 AI를 연결하는 Bridge 스크립트 모음입니다.  
+각 스크립트는 **독립 프로세스**로 실행되며, MyTok 서버와는 Bot API(HTTP 폴링)로 통신합니다.
 
 ---
 
