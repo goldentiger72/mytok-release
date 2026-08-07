@@ -84,7 +84,7 @@ async function askOpenClaw(userMessage) {
   // 싱글쿼트 이스케이프: ' → '\''
   const escaped = userMessage.replace(/'/g, "'\\''");
   const skArg = sessionKey ? ` --session-key '${sessionKey}'` : '';
-  const cmd = `${OPENCLAW_BIN} agent --agent '${OPENCLAW_AGENT}' --message '${escaped}' --json --no-color${skArg} 2>&1`;
+  const cmd = `${OPENCLAW_BIN} agent --agent '${OPENCLAW_AGENT}' --message '${escaped}' --json${skArg} 2>&1`;
 
   const { stdout, stderr, code } = await runOpenClaw(cmd);
 

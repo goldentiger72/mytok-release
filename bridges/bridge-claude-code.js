@@ -125,29 +125,15 @@ async function runClaudeCode(prompt) {
   const childEnv = { ...process.env };
   delete childEnv.ANTHROPIC_API_KEY;
 
-  // 봇 전용 격리 설정 폴더 지정 (사용자 대화 세션과의 파일 락 충돌 차단)
-  const clConfigDir = path.join(os.homedir(), '.claude-mytok');
-  if (!fs.existsSync(clConfigDir)) {
-    fs.mkdirSync(clConfigDir, { recursive: true });
-  }
-  childEnv.CLAUDE_CONFIG_DIR = clConfigDir;
-
-  // 글로벌 MCP 설정이 봇 전용 격리 폴더에도 반영되도록 복사/동기화
-  const globalConfigPath = path.join(os.homedir(), '.claude.json');
-  const localConfigPath = path.join(clConfigDir, 'config.json');
-  if (fs.existsSync(globalConfigPath)) {
-    try {
-      fs.copyFileSync(globalConfigPath, localConfigPath);
-    } catch (e) {
-      console.error('[Claude Code Bridge] 글로벌 설정 파일 복사 실패:', e);
-    }
-  }
+  // 기본 ~/.claude 설정 및 인증(macOS Keychain)을 그대로 사용
+  // -p (print mode)는 일회성 실행이므로 파일 락 충돌 없음
 
   return new Promise((resolve, reject) => {
     // Windows: cmd.exe /c 를 통해 claude.cmd 실행
+    const claudeArgs = '--dangerously-skip-permissions --permission-mode bypassPermissions --output-format text';
     const [cmd, args] = process.platform === 'win32'
-      ? ['cmd', ['/c', 'claude', '--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions', '-p', prompt, '--output-format', 'text']]
-      : ['claude', ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions', '-p', prompt, '--output-format', 'text']];
+      ? ['cmd', ['/c', `claude ${claudeArgs} -p "${prompt.replace(/"/g, '\\"')}"`]]
+      : ['/bin/bash', ['-l', '-c', `claude ${claudeArgs} -p ${JSON.stringify(prompt)}`]];
 
     console.log(`[Claude Code Bridge] 프롬프트 길이: ${prompt.length}자`);
 
