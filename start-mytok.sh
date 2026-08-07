@@ -12,6 +12,13 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ARG_MODE="${1:-auto}"
 
+# .env에서 BASE_URL 읽기
+CF_DOMAIN=""
+if [ -f "$SCRIPT_DIR/backend/.env" ]; then
+  CF_DOMAIN=$(grep -E '^BASE_URL=' "$SCRIPT_DIR/backend/.env" | cut -d'=' -f2-)
+fi
+CF_DOMAIN="${CF_DOMAIN:-https://mytok-mini.aiup.co.kr}"
+
 # macOS Tailscale CLI 자동 탐색 헬퍼
 _tailscale() {
   if command -v tailscale &>/dev/null; then
@@ -72,7 +79,7 @@ case "$MODE" in
     cloudflared tunnel --config ~/.cloudflared/mytok-config.yml run >/dev/null 2>&1 &
     sleep 2
     echo "[MyTok] Cloudflare 터널 백그라운드 구동 완료."
-    echo "[MyTok] 🌐 외부 도메인 접속: https://mytok.aiup.co.kr"
+    echo "[MyTok] 🌐 외부 도메인 접속: $CF_DOMAIN"
     echo "[MyTok] 🔒 Tailscale VPN 접속: http://$TS_IP:3500"
     TS_HOSTNAME=$(_tailscale status --json 2>/dev/null | grep -o '"DNSName":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\.$//')
     if [ -n "$TS_HOSTNAME" ]; then
@@ -85,7 +92,7 @@ case "$MODE" in
     cloudflared tunnel --config ~/.cloudflared/mytok-config.yml run >/dev/null 2>&1 &
     sleep 2
     echo "[MyTok] Cloudflare 터널 백그라운드 구동 완료."
-    echo "[MyTok] 🌐 외부 도메인 접속: https://mytok.aiup.co.kr"
+    echo "[MyTok] 🌐 외부 도메인 접속: $CF_DOMAIN"
     ;;
 
   tailscale)

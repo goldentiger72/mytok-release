@@ -60,7 +60,20 @@ OWNER_EMAIL=you@gmail.com
 BASE_URL=https://your-machine.tail12345.ts.net:3500
 ```
 
-### 4. 서버 시작
+### 4. Google OAuth 리디렉션 URI 등록
+
+[Google Cloud Console](https://console.cloud.google.com/apis/credentials)에서 OAuth 클라이언트를 열고,
+**승인된 리디렉션 URI**에 접속할 모든 도메인의 콜백 URL을 등록합니다:
+
+```
+http://localhost:3500/auth/google/callback
+https://your-domain.example.com/auth/google/callback
+```
+
+> **주의**: 이 설정이 누락되면 모바일 등 외부 접속 시 `400 redirect_uri_mismatch` 오류가 발생합니다.
+> localhost와 외부 도메인 모두 등록해야 합니다.
+
+### 5. 서버 시작
 
 ```bash
 ./start-mytok.sh
@@ -71,7 +84,7 @@ BASE_URL=https://your-machine.tail12345.ts.net:3500
 - `./start-mytok.sh --cloudflare` — Cloudflare 터널
 - `./start-mytok.sh --local` — 로컬 개발용
 
-### 5. 접속
+### 6. 접속
 
 브라우저에서 `BASE_URL`로 접속합니다.
 PWA 설치: 브라우저 주소창의 "설치" 아이콘 클릭.
@@ -95,6 +108,44 @@ mytok-release/
 ├── start-mytok.bat       # 시작 스크립트 (Windows)
 └── package.json
 ```
+
+## 🌐 Cloudflare Tunnel 설정 (선택)
+
+외부 도메인으로 접속하려면 Cloudflare Tunnel을 설정합니다.
+
+```bash
+# 1. cloudflared 설치 (macOS)
+brew install cloudflared
+
+# 2. Cloudflare 로그인
+cloudflared login
+
+# 3. 터널 생성
+cloudflared tunnel create mytok-mini
+# 출력되는 터널 ID와 credentials 경로를 기록합니다
+
+# 4. DNS 라우트 등록
+cloudflared tunnel route dns <터널이름> your-domain.example.com
+
+# 5. 설정 파일 생성
+cat > ~/.cloudflared/mytok-config.yml << EOF
+tunnel: <터널이름>
+credentials-file: /Users/<username>/.cloudflared/<터널ID>.json
+
+ingress:
+  - hostname: your-domain.example.com
+    service: http://localhost:3500
+  - service: http_status:404
+EOF
+
+# 6. backend/.env의 BASE_URL을 도메인으로 설정
+# BASE_URL=https://your-domain.example.com
+
+# 7. Cloudflare 모드로 서버 시작
+./start-mytok.sh --cloudflare
+```
+
+> **주의**: Google OAuth 리디렉션 URI에 `https://your-domain.example.com/auth/google/callback`을 반드시 추가하세요. (4단계 참조)
 
 ## 🔧 AI 봇 연동 (선택)
 

@@ -35,19 +35,67 @@ bun install
 
 ## Bridge 실행 방법
 
-### Hermes Bridge (로컬 Ollama AI)
+### Hermes Bridge (Hermes Agent API)
 
-**사전 조건**: Ollama 설치 및 실행 중, Hermes 모델 pull 완료
+**사전 조건**: [Hermes](https://github.com/hermes-agent/hermes) 설치 및 Gateway 실행 중
+
+#### 1. Hermes API 서버 활성화
+
+Hermes Gateway의 내장 API 서버(OpenAI 호환)를 활성화해야 합니다.
 
 ```bash
-# Ollama 설치: https://ollama.com
-ollama pull hermes3
-
-# Bridge 실행
-bun bridge-hermes.js
-# 또는: node bridge-hermes.js
-# 출력: [Hermes Bridge] 시작됨. 봇 채팅방 폴링 중...
+# API 서버 키 생성
+openssl rand -hex 24
+# 출력 예: e68c44f5dfce0a6eaa13cb3445b3f6689d189457d6e803c0
 ```
+
+`~/.hermes/config.yaml`에서 `api_server` 섹션에 `enabled`와 `port`를 추가합니다:
+
+```yaml
+  api_server:
+    enabled: true
+    port: 8642
+    max_concurrent_runs: 10
+```
+
+`~/.hermes/.env`에 API 서버 키를 추가합니다:
+
+```env
+API_SERVER_KEY=<위에서 생성한 키>
+```
+
+> **주의**: `API_SERVER_KEY`가 없으면 API 서버가 시작을 거부합니다.
+> `config.yaml`에 `enabled: true`와 `port`가 모두 있어야 합니다.
+
+#### 2. Gateway 재시작
+
+```bash
+hermes gateway stop && hermes gateway start
+```
+
+API 서버 동작 확인:
+
+```bash
+curl -H "Authorization: Bearer <API_SERVER_KEY>" http://localhost:8642/v1/models
+```
+
+#### 3. bridges/.env 설정
+
+```env
+HERMES_URL=http://localhost:8642
+HERMES_MODEL=hermes-agent
+HERMES_API_KEY=<API_SERVER_KEY와 동일한 값>
+```
+
+#### 4. Bridge 실행
+
+```bash
+bun bridge-hermes.js
+# 출력: [Hermes Bridge] Hermes API 연결됨 — 모델: hermes-agent
+```
+
+> **참고**: Gateway 시작 직후에는 API 서버 준비에 수 초가 걸릴 수 있습니다.
+> `Hermes API 연결 실패` 메시지가 나오면 잠시 후 재실행하세요.
 
 > **참고**: 종량제 Anthropic API 방식(`bridge-claude.js`)은 헌법 Principle VI
 > (Cost-Safe AI Backends, v1.1.0)에 따라 **제거되었습니다**. Claude를 쓰려면 아래
