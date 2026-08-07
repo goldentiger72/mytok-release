@@ -34,7 +34,7 @@ const MYTOK_URL   = (process.env.MYTOK_URL  || 'http://localhost:3500').replace(
 const HERMES_URL  = (process.env.HERMES_URL || 'http://localhost:8642').replace(/\/$/, '');
 const HERMES_KEY  = process.env.HERMES_API_KEY || '';
 const MODEL       = process.env.HERMES_MODEL || 'hermes';
-const TIMEOUT_MS  = 120_000;
+const TIMEOUT_MS  = 300_000; // 5분 (Hermes Agent 복잡한 작업 대응)
 
 if (!BOT_TOKEN) {
   console.error('[Hermes Bridge] BOT_TOKEN 또는 HERMES_BOT_TOKEN이 필요합니다.');
