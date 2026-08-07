@@ -110,22 +110,28 @@ async function checkHermes() {
 }
 
 // ── MyTok REST API ──────────────────────────────────────────────────────────
-async function sendMessage(content) {
+async function sendMessage(content, parentMessageId = null) {
+  const body = { content };
+  if (parentMessageId) body.parentMessageId = parentMessageId;
+
   const res = await fetch(`${MYTOK_URL}/bot/${BOT_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content })
+    body: JSON.stringify(body)
   });
   if (!res.ok) throw new Error(`sendMessage HTTP ${res.status}`);
 }
 
 // "응답 작성 중" 표시 on/off — 표시용 신호라 실패는 조용히 무시
-async function sendTyping(on) {
+async function sendTyping(on, parentMessageId = null) {
   try {
+    const body = { on };
+    if (parentMessageId) body.parentMessageId = parentMessageId;
+
     await fetch(`${MYTOK_URL}/bot/${BOT_TOKEN}/typing`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ on })
+      body: JSON.stringify(body)
     });
   } catch (_) { /* ignore */ }
 }
@@ -237,6 +243,31 @@ function connect() {
     } finally {
       processing = false;
       sendTyping(false); // "응답 작성 중" 해제
+    }
+  });
+
+  socket.on('new_thread_reply', async ({ roomId, messageId, reply }) => {
+    if (reply.isBot) return;
+
+    const text = (reply.content || '').trim();
+    if (!text || processing) return;
+
+    processing = true;
+    console.log(`[Hermes Bridge] 스레드 답글 처리 중: "${text.slice(0, 60)}"`);
+    sendTyping(true, messageId);
+
+    try {
+      const botReply = await askHermes(text);
+      if (botReply) {
+        await sendMessage(botReply, messageId);
+        console.log('[Hermes Bridge] 스레드 답글 응답 전송 완료');
+      }
+    } catch (err) {
+      console.error('[Hermes Bridge] 스레드 오류:', err.message);
+      try { await sendMessage(`⚠️ Hermes 오류: ${err.message}`, messageId); } catch (_) {}
+    } finally {
+      processing = false;
+      sendTyping(false, messageId);
     }
   });
 

@@ -77,13 +77,16 @@ case "$MODE" in
   both)
     echo "[MyTok] 감지 결과: Cloudflare 터널 + Tailscale 모두 사용 가능"
     cloudflared tunnel --config ~/.cloudflared/mytok-config.yml run >/dev/null 2>&1 &
+    _tailscale serve --yes --bg 3500 >/dev/null 2>&1 || true
     sleep 2
-    echo "[MyTok] Cloudflare 터널 백그라운드 구동 완료."
+    echo "[MyTok] Cloudflare 터널 및 Tailscale Serve 구동 완료."
     echo "[MyTok] 🌐 외부 도메인 접속: $CF_DOMAIN"
-    echo "[MyTok] 🔒 Tailscale VPN 접속: http://$TS_IP:3500"
     TS_HOSTNAME=$(_tailscale status --json 2>/dev/null | grep -o '"DNSName":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\.$//')
     if [ -n "$TS_HOSTNAME" ]; then
-      echo "[MyTok] 🔒 Tailscale MagicDNS 접속: http://$TS_HOSTNAME:3500"
+      echo "[MyTok] 🔒 Tailscale MagicDNS (포트 없음): https://$TS_HOSTNAME"
+      echo "[MyTok] 🔒 Tailscale IP (포트 포함): http://$TS_IP:3500"
+    else
+      echo "[MyTok] 🔒 Tailscale VPN 접속: http://$TS_IP:3500"
     fi
     ;;
 
@@ -97,11 +100,14 @@ case "$MODE" in
 
   tailscale)
     echo "[MyTok] 감지 결과/강제: Tailscale VPN 전용 구동"
+    _tailscale serve --yes --bg 3500 >/dev/null 2>&1 || true
     if [ -n "$TS_IP" ]; then
-      echo "[MyTok] 🔒 Tailscale VPN 접속: http://$TS_IP:3500"
       TS_HOSTNAME=$(_tailscale status --json 2>/dev/null | grep -o '"DNSName":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\.$//')
       if [ -n "$TS_HOSTNAME" ]; then
-        echo "[MyTok] 🔒 Tailscale MagicDNS 접속: http://$TS_HOSTNAME:3500"
+        echo "[MyTok] 🔒 Tailscale MagicDNS (포트 없음): https://$TS_HOSTNAME"
+        echo "[MyTok] 🔒 Tailscale IP (포트 포함): http://$TS_IP:3500"
+      else
+        echo "[MyTok] 🔒 Tailscale VPN 접속: http://$TS_IP:3500"
       fi
     else
       echo "[MyTok] ⚠️ Tailscale IP가 감지되지 않았습니다. 로컬 주소로 접속하세요."
